@@ -15,11 +15,13 @@
 package manager
 
 import (
+	"encoding/json"
+	"fmt"
+	"k8s.io/klog"
 	"time"
 
 	"github.com/AliyunContainerService/kube-eventer/core"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
 )
 
 var (
@@ -100,5 +102,21 @@ func (rm *realManager) housekeep() {
 	// when this stops to be true.
 	events := rm.source.GetNewEvents()
 	klog.V(0).Infof("Exporting %d events", len(events.Events))
-	rm.sink.ExportEvents(events)
+	alterEvents := &core.EventBatch{Timestamp: events.Timestamp, Events: nil}
+	if len(events.Events) > 0 {
+		for _, event := range events.Events {
+			// 将结构体转换为 JSON
+			jsonData, err := json.Marshal(event)
+			if err != nil {
+				klog.V(0).Infof("events json Marshal Error:", err)
+			}
+
+			// 将 JSON 转换为字符串并打印
+			fmt.Println(string(jsonData))
+			if event.Type == "Warning" {
+				alterEvents.Events = append(alterEvents.Events, event)
+			}
+		}
+		rm.sink.ExportEvents(alterEvents)
+	}
 }
